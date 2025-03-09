@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ethereum Private Key Finder</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Ethereum Private Key Finder</h1>
+
+    <!-- Search Bar -->
+    <input type="text" id="searchInput" placeholder="Search by Address or Private Key">
+    <button onclick="searchPrivateKeyOrAddress()">Search</button>
+
+    <!-- Pagination -->
+    <div id="pagination">
+        <button onclick="firstPage()">First</button>
+        <button onclick="previousPage()">Previous</button>
+        <span id="pageInfo">Page 1</span>
+        <button onclick="nextPage()">Next</button>
+        <button onclick="lastPage()">Last</button>
+    </div>
+
+    <!-- Download Button -->
+    <button onclick="downloadAllKeysAsBLF()">Download All Private Keys</button>
+
+    <!-- Results Table -->
+    <table>
+        <thead>
+            <tr>
+                <th>Private Key</th>
+                <th>Ethereum Address</th>
+            </tr>
+        </thead>
+        <tbody id="resultTable"></tbody>
+    </table>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script>
+        let currentPage = 1n;
+        let keysPerPage = 1000n;
+        const firstPrivateKey = BigInt("0x0000000000000000000000000000000000000000000000000000000000000001");
+        const lastPrivateKey = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140");
+        const totalPages = (lastPrivateKey - firstPrivateKey) / keysPerPage + 1n;
+
+        // Generate private keys and addresses by page
+        const loadPage = (page) => {
+            if (page < 1n || page > totalPages) {
+                alert("Invalid page number!");
+                return;
+            }
+
+            const startKey = (page - 1n) * keysPerPage + firstPrivateKey;
+            const endKey = startKey + keysPerPage - 1n;
+
+            const table = document.getElementById("resultTable");
+            table.innerHTML = '';
+
+            for (let i = startKey; i <= endKey && i <= lastPrivateKey; i++) {
+                const privateKey = i.toString(16).padStart(64, '0');
+                const wallet = new ethers.Wallet('0x' + privateKey);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${privateKey}</td><td>${wallet.address}</td>`;
+                table.appendChild(row);
+            }
+
+            document.getElementById('pageInfo').innerText = `Page ${page} of ${totalPages}`;
+            currentPage = page;
+        };
+
+        // Navigation functions
+        const firstPage = () => loadPage(1n);
+        const previousPage = () => currentPage > 1n && loadPage(currentPage - 1n);
+        const nextPage = () => currentPage < totalPages && loadPage(currentPage + 1n);
+        const lastPage = () => loadPage(totalPages);
+
+        // Download all keys and save as BLF file
+        const downloadAllKeysAsBLF = async () => {
+            const blob = new Blob([JSON.stringify({
+                keys: Array.from({length: Number(totalPages)}, (_, i) => {
+                    const privateKey = (BigInt(i) + firstPrivateKey).toString(16).padStart(64, '0');
+                    const wallet = new ethers.Wallet('0x' + privateKey);
+                    return { privateKey, address: wallet.address };
+                })
+            })], { type: 'application/json' });
+
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "ethkeys.blf";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        document.addEventListener("DOMContentLoaded", () => loadPage(currentPage));
+    </script>
+</body>
+</html>
